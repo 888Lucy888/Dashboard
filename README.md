@@ -2,7 +2,7 @@
 
 ## Simulation and Visualization - Midterm II
 
-# Team:
+## Team:
 - Jessica Isunza
 - Ángel Martínez
 - Lucia Castañeda
