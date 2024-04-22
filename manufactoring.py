@@ -1,6 +1,7 @@
 import simpy
 import random
 from enum import Enum
+import numpy as np
 
 class Debug(Enum):
     DEBUG = 0
@@ -48,7 +49,7 @@ RESTOCK_TIME = 2    # The average time units it takes the bus boy to restock a s
 FIX_TIME = 3        # The average time for fixing the station
 WORK_TIME = 4       # The average working time for the stations
 WRK_STATIONS = 6    # Number of work stations in the factory
-WRK_STATION_RATES = [0.2,0.1,0.15,0.05,0.07,0.1]    # Declared error rate of work stations
+WRK_STATION_RATES = [0.2, 0.1, 0.15, 0.05, 0.07, 0.1]    # Declared error rate of work stations
 DEBUG_LEVEL = Debug.ERROR
        
 def debugLog(level: Debug, msg: str, extra: str = "") -> None:
@@ -206,6 +207,14 @@ class Factory(object):
         self._workstations = []
         self._storage = []
         self._status = FactoryStatus.OPEN
+        self._daily_production = []
+        self._daily_quality_failures = []
+        self._daily_occupancy = [[] for _ in range(WRK_STATIONS)]
+        self._daily_downtime = [[] for _ in range(WRK_STATIONS)]
+        self._daily_fix_time = []
+        self._daily_waiting_time = []
+        self._current_day = 0
+        
         # Create all the work stations
         for i in range(WRK_STATIONS):
             self._workstations.append(Workstation(self._env, self._restockDevice, i, WRK_STATION_RATES[i]))
@@ -255,17 +264,25 @@ class Factory(object):
         if not prod.isAborted:
             if random.random() < REJECT_RATE:
                 prod.status = ProductStatus.FAIL
+                self._daily_quality_failures[self._current_day] += 1
             else:
                 prod.status = ProductStatus.DONE
+        self._daily_production[self._current_day] += 1
         
     def produce(self) -> simpy.Process:
-        i = 0
-        # for i in range(5):
-        while True:
-            self._env.process(self.orderProduct(i+1))
-            yield self._env.timeout(0.1)
-            i += 1
-          
+        self._current_day = 0
+        while self._current_day < TICKS_PER_DAY:
+            self._daily_production.append(0)
+            self._daily_quality_failures.append(0)
+            for i in range(WRK_STATIONS):
+                self._daily_occupancy[i].append(0)
+                self._daily_downtime[i].append(0)
+            self._daily_fix_time.append(0)
+            self._daily_waiting_time.append(0)
+            self._env.process(self.orderProduct(self._current_day + 1))
+            yield self._env.timeout(1)
+            self._current_day += 1
+    
     def shutDown(self) -> None:
         if random.random() < CLOSE_RATE:
             closing_in = abs(random.normalvariate(12,1))
@@ -284,13 +301,39 @@ class Factory(object):
     def closeDown(self, time: float) -> None:
         if self._status != FactoryStatus.SHUTDOWN:
             self._status = FactoryStatus.CLOSED
-            # map(lambda s: s.endProduction(time), self._workstations)
             [w.endProduction(time) for w in self._workstations]
             for prd in self._storage:
                     if prd._status == ProductStatus.PRODUCING:
                         prd.stopProduction(time)
-            debugLog(Debug.INFO, "Factory closed at %.2f." % time) 
+            debugLog(Debug.INFO, "Factory closed at %.2f." % time)
+            self._current_day = TICKS_PER_DAY
 
+    def collect_data(self, start_day: int = 0, end_day: int = None) -> dict:
+        if end_day is None:
+            end_day = len(self._daily_production)
+        total_production = sum(self._daily_production[start_day:end_day])
+        total_quality_failures = sum(self._daily_quality_failures[start_day:end_day])
+        avg_production = np.mean(self._daily_production[start_day:end_day])
+        avg_quality_failures = np.mean(self._daily_quality_failures[start_day:end_day])
+        avg_waiting_time = np.mean(self._daily_waiting_time[start_day:end_day])
+        avg_fix_time = np.mean(self._daily_fix_time[start_day:end_day])
+        
+        avg_occupancy = []
+        avg_downtime = []
+        for i in range(WRK_STATIONS):
+            avg_occupancy.append(np.mean(self._daily_occupancy[i][start_day:end_day]))
+            avg_downtime.append(np.mean(self._daily_downtime[i][start_day:end_day]))
+        
+        return {
+            'total_production': total_production,
+            'total_quality_failures': total_quality_failures,
+            'avg_production': avg_production,
+            'avg_quality_failures': avg_quality_failures,
+            'avg_waiting_time': avg_waiting_time,
+            'avg_fix_time': avg_fix_time,
+            'avg_occupancy': avg_occupancy,
+            'avg_downtime': avg_downtime
+        }
 
 def main() -> None:
     env = simpy.Environment()
@@ -300,5 +343,21 @@ def main() -> None:
     factory.closeDown(TICKS_PER_DAY)
     print(factory)
     
+    # Collect data for the entire simulation
+    simulation_data = factory.collect_data()
+    print("Simulation Results:")
+    print("Total Production:", simulation_data['total_production'])
+    print("Total Quality Failures:", simulation_data['total_quality_failures'])
+    print("Average Production:", simulation_data['avg_production'])
+    print("Average Quality Failures:", simulation_data['avg_quality_failures'])
+    print("Average Waiting Time:", simulation_data['avg_waiting_time'])
+    print("Average Fix Time:", simulation_data['avg_fix_time'])
+    print("Average Occupancy:")
+    for i in range(WRK_STATIONS):
+        print(f"  Workstation {i+1}: {simulation_data['avg_occupancy'][i]}")
+    print("Average Downtime:")
+    for i in range(WRK_STATIONS):
+        print(f"  Workstation {i+1}: {simulation_data['avg_downtime'][i]}")
+
 if __name__ == '__main__':
     main()
