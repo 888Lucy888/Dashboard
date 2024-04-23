@@ -121,17 +121,17 @@ def simulate():
     plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
     plt.show()
 
-    # Generate random daily production counts for each day of the week
-    daily_production = [np.random.randint(100, 500) for _ in range(7)]
+    # Generate random daily delay counts for each day of the week
+    daily_delay = [np.random.uniform(0, 10) for _ in range(7)]
     days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     y_pos = range(len(days))
 
-    # Plot bar chart for daily production
+    # Plot bar chart for daily delay
     plt.figure(figsize=(10, 6))
-    plt.bar(y_pos, daily_production, align='center', alpha=0.5)
+    plt.bar(y_pos, daily_delay, align='center', alpha=0.5, color='orange')
     plt.xticks(y_pos, days)
-    plt.ylabel('Production Count')
-    plt.title('Daily Production')
+    plt.ylabel('Delay (hours)')
+    plt.title('Daily Production Delay')
     plt.tight_layout()
     plt.show()
 
