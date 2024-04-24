@@ -3,8 +3,8 @@
 ## Simulation and Visualization - Midterm II
 
 ## Install
-- pip install tabulate
 - pip install simpy
+- pip install tabulate
 
 ## Team:
 - Jessica Isunza
