@@ -121,6 +121,7 @@ def main():
 
     total_data = [
         ["Total Production", total_production],
+        ["Total Production REJECTED", total_rejected],
         ["Average Production Per Workstation", avg_production],
         ["Total Supply Time", total_supply_time],
         ["Average Supply Time For Workstation", avg_supply_time],
@@ -140,6 +141,21 @@ def main():
     print("\nTotal or Average Values:")
     print(tabulate(total_data))
 
+    workstation_data = []
+    for station in stations:
+        workstation_data.append([
+            f"Work Station {station.id}",
+            station.production,
+            station.fixing_time,
+            station.downtime,
+            station.occupancy / station.production if station.production != 0 else 0
+        ])
+
+    headers = ["Workstation", "Production", "Fixing Time", "Downtime", "Occupancy"]
+
+    print("Workstation Data:")
+    print(tabulate(workstation_data, headers=headers))
+
     # Generate pie chart
     labels = ['Total Production', 'Total Rejected']
     sizes = [total_production, total_rejected]
@@ -150,6 +166,46 @@ def main():
     plt.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%', shadow=True, startangle=140)
     plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
     plt.title('Total Production vs Total Rejected')
+    plt.show()
+
+    # Plot production per workstation
+    plt.figure(figsize=(10, 5))
+    plt.bar([f"Work Station {station.id}" for station in stations], [station.production for station in stations], color='skyblue')
+    plt.xlabel('Workstation')
+    plt.ylabel('Production')
+    plt.title('Production per Workstation')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.show()
+
+    # Plot fixing time per workstation
+    plt.figure(figsize=(10, 5))
+    plt.bar([f"Work Station {station.id}" for station in stations], [station.fixing_time for station in stations], color='lightgreen')
+    plt.xlabel('Workstation')
+    plt.ylabel('Fixing Time')
+    plt.title('Fixing Time per Workstation')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.show()
+
+    # Plot downtime per workstation
+    plt.figure(figsize=(10, 5))
+    plt.bar([f"Work Station {station.id}" for station in stations], [station.downtime for station in stations], color='salmon')
+    plt.xlabel('Workstation')
+    plt.ylabel('Downtime')
+    plt.title('Downtime per Workstation')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.show()
+
+    # Plot occupancy per workstation
+    plt.figure(figsize=(10, 5))
+    plt.bar([f"Work Station {station.id}" for station in stations], [station.occupancy / station.production if station.production != 0 else 0 for station in stations], color='lightcoral')
+    plt.xlabel('Workstation')
+    plt.ylabel('Occupancy')
+    plt.title('Occupancy per Workstation')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
     plt.show()
 
 if __name__ == "__main__":
