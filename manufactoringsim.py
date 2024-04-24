@@ -208,5 +208,20 @@ def main():
     plt.tight_layout()
     plt.show()
 
+    # Generate line chart
+    workstation_names = [f"Work Station {station.id}" for station in stations]
+    avg_downtime_data = [station.downtime / num_stations for station in stations]
+    avg_fixing_time_data = [station.fixing_time / num_stations for station in stations]
+
+    plt.plot(workstation_names, avg_fixing_time_data, marker='o', color='green', label='Average Fixing Time')
+    plt.plot(workstation_names, avg_downtime_data, marker='x', color='orange', label='Average Downtime')
+    plt.xlabel('Workstation')
+    plt.ylabel('Time')
+    plt.title('Comparison of Average Fixing Time and Downtime Per Workstation')
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()
+
 if __name__ == "__main__":
     main()
