@@ -1,5 +1,6 @@
 import simpy
 import numpy as np
+import matplotlib.pyplot as plt
 from tabulate import tabulate
 
 # Define constants
@@ -24,6 +25,7 @@ class ManufacturingFacility:
         self.total_production_delay = 0
         self.total_quality_failures = 0
         self.downtime = [0] * NUM_WORKSTATIONS
+        self.fixing_times = []
 
     def production_process(self):
         while True:
@@ -45,7 +47,10 @@ class ManufacturingFacility:
                 # Check if the workstation fails
                 if np.random.random() < FAILURE_PROBABILITIES[i]:
                     self.downtime[i] += 1
-                    yield self.env.timeout(np.random.exponential(FIXING_TIME_MEAN))
+                    fixing_time = np.random.exponential(FIXING_TIME_MEAN)
+                    self.total_fixing_time += fixing_time
+                    self.fixing_times.append(fixing_time)
+                    yield self.env.timeout(fixing_time)
                 
                 # Use a bin of raw material
                 self.bins[bin_index] -= 1
@@ -84,9 +89,12 @@ def simulate():
     occupancy_per_station = [(PRODUCTION_TIME - downtime) / PRODUCTION_TIME for downtime in facility.downtime]
     downtime_per_station = facility.downtime
     occupancy_supplier_device = facility.supplier_device.count / PRODUCTION_TIME
-    average_fixing_time = sum(facility.downtime) / sum(FAILURE_PROBABILITIES)
+    average_fixing_time = sum(facility.fixing_times) / len(facility.fixing_times)
     average_delay_production = facility.total_production_delay / facility.production_count
     average_faulty_products = facility.total_quality_failures / facility.production_count
+    final_production = facility.production_count
+    total_faulty_products = facility.total_quality_failures
+    total_successful_products = final_production - total_faulty_products
 
     # Print results
     print("Final production:", final_production)
@@ -96,8 +104,55 @@ def simulate():
     print("Average fixing time:", average_fixing_time)
     print("Average delay of production:", average_delay_production)
     print("Average rate of faulty products:", average_faulty_products)
+    print("Final production:", final_production)
+    print("Total faulty products:", total_faulty_products)
+    print("Total successful products:", total_successful_products)
 
-        # Prepare tables
+    # Create a pie chart
+    labels = ['Faulty Products', 'Successful Products']
+    sizes = [total_faulty_products, total_successful_products]
+    explode = (0.1, 0)  # explode the 1st slice (Faulty Products)
+    plt.pie(sizes, explode=explode, labels=labels, autopct='%1.1f%%', shadow=True, startangle=140)
+    plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+    plt.title('Production Results')
+    plt.show()
+
+    # Create a column chart
+    labels = ['Final Production', 'Faulty Products', 'Successful Products']
+    values = [final_production, total_faulty_products, total_successful_products]
+    plt.bar(labels, values, color=['blue', 'red', 'green'])
+    plt.xlabel('Production Outcome')
+    plt.ylabel('Quantity')
+    plt.title('Production Outcome Comparison')
+    plt.show()
+
+    # Plot line chart
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, NUM_WORKSTATIONS + 1), downtime_per_station, marker='o', label='Downtime per Station')
+    plt.plot(range(1, NUM_WORKSTATIONS + 1), [average_fixing_time] * NUM_WORKSTATIONS, linestyle='--', label='Average Fixing Time')
+    plt.xlabel('Workstation')
+    plt.ylabel('Time')
+    plt.title('Downtime per Station vs Average Fixing Time')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    # Stacked Bar Chart for Workstation Metrics
+    workstation_numbers = range(1, NUM_WORKSTATIONS + 1)
+    occupancy_per_station = [0.8, 0.7, 0.85, 0.75, 0.9, 0.95]  # Sample data (occupancy)
+    downtime_per_station = [5, 7, 4, 6, 3, 5]  # Sample data (downtime)
+
+    plt.figure(figsize=(10, 6))
+    plt.bar(workstation_numbers, occupancy_per_station, label='Occupancy', color='skyblue')
+    plt.bar(workstation_numbers, downtime_per_station, label='Downtime', color='orange', bottom=occupancy_per_station)
+    plt.xlabel('Workstation')
+    plt.ylabel('Count')
+    plt.title('Workstation Metrics')
+    plt.legend()
+    plt.xticks(workstation_numbers)
+    plt.show()
+    
+    # Prepare tables
     workstation_table = [[f"Workstation {i+1}", occupancy_per_station[i], downtime_per_station[i]] for i in range(NUM_WORKSTATIONS)]
     total_table = [["Total", sum(occupancy_per_station), sum(downtime_per_station)]]
 
@@ -114,4 +169,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-                                               
