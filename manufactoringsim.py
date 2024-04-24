@@ -1,4 +1,5 @@
 import simpy
+import random
 import numpy as np
 import matplotlib.pyplot as plt
 from tabulate import tabulate
@@ -56,7 +57,9 @@ class ManufacturingFacility:
                 self.bins[bin_index] -= 1
                 
                 # Process time at the workstation
-                yield self.env.timeout(np.random.normal(WORK_TIME_MEAN))
+                work_time = abs(np.random.normal(WORK_TIME_MEAN, 1))  # Adding standard deviation of 1
+                if work_time > 0:
+                    yield self.env.timeout(work_time)
                 
                 # Check for quality issues
                 if i == NUM_WORKSTATIONS - 1 and np.random.random() < REJECTION_PROBABILITY:
@@ -89,9 +92,9 @@ def simulate():
     occupancy_per_station = [(PRODUCTION_TIME - downtime) / PRODUCTION_TIME for downtime in facility.downtime]
     downtime_per_station = facility.downtime
     occupancy_supplier_device = facility.supplier_device.count / PRODUCTION_TIME
-    average_fixing_time = sum(facility.fixing_times) / len(facility.fixing_times)
-    average_delay_production = facility.total_production_delay / facility.production_count
-    average_faulty_products = facility.total_quality_failures / facility.production_count
+    average_fixing_time = sum(facility.fixing_times) / len(facility.fixing_times) if facility.fixing_times else 0
+    average_delay_production = facility.total_production_delay / facility.production_count if facility.production_count else 0
+    average_faulty_products = facility.total_quality_failures / facility.production_count if facility.production_count else 0
     final_production = facility.production_count
     total_faulty_products = facility.total_quality_failures
     total_successful_products = final_production - total_faulty_products
@@ -162,10 +165,114 @@ def simulate():
     print("\nTotal Metrics:")
     print(tabulate(total_table, headers=["Metric", "Value"]))
 
-# Main function
-def main():
-    # Run simulation
-    simulate()
+class WorkStations(object):
+    def __init__(self, id: int, env: simpy.Environment, refill: simpy.Resource, err) -> None:
+        self.env = env
+        self.id = id
+        self.state = "Free" # "Broken", "Working"
+        self.down_time = 0.0
+        self.material = 25
+        self.made = 0
+        self.occup_time = 0.0
+        self.fix_time = 0.0
 
-if __name__ == "__main__":
-    main()
+        self.error_rate = err
+        self.refill = refill
+
+        # Actions
+        ''' self.get_material = self.env.process(self.getMaterial())
+        self.ask_material = self.env.process(self.askMaterial())
+        self.ask_repair = self.env.process(self.askRepair())'''
+        self.action = self.env.process(self.work())
+
+    def work(self) -> None:
+        while True:
+            if random.normalvariate(1, 1) < self.error_rate:  # Adding standard deviation of 1
+                self.state = "Broken"
+                yield self.env.process(self.askRepair()) 
+            if self.material > 0:
+                self.state = "Working"
+                self.material -= 1
+                self.made += 1
+                print(f"Work Station {self.id} is working. Material left: {self.material}")
+            else:
+                yield self.env.process(self.askMaterial()) 
+            # Generate positive timeout values
+            work_time = abs(np.random.normal(WORK_TIME_MEAN, 1))  # Adding standard deviation of 1
+            if work_time > 0:
+                self.occup_time += work_time
+                yield self.env.timeout(work_time)
+    
+    def getMaterial(self) -> None:
+        if (self.material > 0):
+            self.material -= 1
+        else:
+            self.askMaterial()
+    
+    def askMaterial(self) -> None:
+        print("Need Material Refill :c (Work Station %d)" % self.id)
+        with self.refill.request() as req:
+            # If gets resource or tiemout
+            yes = yield req | self.env.timeout(0.01)
+            if req in yes:
+                yield self.env.timeout(1.5)  # -------------------------------- CHANGE
+                print("Refill Full c: (Work Station %d)" % self.id)
+                self.material = 25
+            else:
+                print("No Available Refill (Work Station %d)" % self.id)
+            self.occup_time +=1
+            yield self.env.timeout(1) 
+
+    def askRepair(self) -> None:
+        fix = abs(random.expovariate(3))
+        self.fix_time += fix
+        yield self.env.timeout(fix)
+        self.state = "Free"
+
+class Product(object):
+    def __init__(self, id: int, env: simpy.Environment) -> None:
+        self.state = "accepted" #Rejected
+        
+
+class Factory(object):
+    def __init__(self, env: simpy.Environment, workstations) -> None:
+        self.env = env
+        self.state = "Operational"  # Closed
+        self.workstations = workstations
+        self.Naccidents = 0
+        self.total_production = 0
+        self.fixing_times = 0.0
+        self.delays = 0.0
+        self.faulty_productions = 0
+
+    def manage_factory(self):
+        while True:
+            print("Factory is operational at time", self.env.now)
+            yield self.env.timeout(1)  
+
+env = simpy.Environment()
+refill = simpy.Resource(env, 3)
+
+works = []
+errors = [0.10, 0.05, 0.07, 0.02, 0.03, 0.05] # -------------------------------- CHANGE
+for i in range (1,6):
+    works.append(WorkStations(i, env, refill, errors[i-1])) 
+factory = Factory(env,works)
+
+factory_process = factory.manage_factory()  
+env.process(factory_process)  
+env.run(until=(60*60*12*5)) 
+
+avg_prod = 0
+avg_ocup = 0
+avg_fix = 0
+for i in works:
+    avg_prod += i.made
+    avg_ocup += i.occup_time
+    avg_fix += i.fix_time
+
+print(f"Average Production: {avg_prod/6}")
+print(f"Average Occupancy Time: {avg_ocup/6}")
+print(f"Average Fixing Time: {avg_fix/6}")
+
+simulate()
